@@ -13,6 +13,51 @@ from torchvision import datasets, transforms
 import torch.nn as nn
 import torch.optim as optim
 
+from sqlalchemy import create_engine, Column, Integer, String
+from sqlalchemy.orm import declarative_base, sessionmaker
+import bcrypt
+import jwt
+
+
+SQLALCHEMY_DATABASE_URL = "postgresql://admin:password123@localhost:5432/ai_hub"
+
+# PostgreSQL은 check_same_thread 옵션이 필요 없습니다.
+engine = create_engine(SQLALCHEMY_DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+
+# 🟢 [NEW] 사용자(User) 테이블 정의
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True)
+    password_hash = Column(String)
+
+# DB 테이블 생성
+Base.metadata.create_all(bind=engine)
+
+# 🟢 [NEW] 서버 켜질 때 기본 관리자(admin) 계정 자동 생성
+def create_default_admin():
+    db = SessionLocal()
+    admin = db.query(User).filter(User.username == "admin").first()
+    if not admin:
+        hashed_pw = bcrypt.hashpw("admin1234!".encode('utf-8'), bcrypt.gensalt())
+        new_admin = User(username="admin", password_hash=hashed_pw.decode('utf-8'))
+        db.add(new_admin)
+        db.commit()
+        print("✅ 기본 관리자 계정 생성 완료 (ID: admin / PW: admin1234!)")
+    db.close()
+
+create_default_admin()
+
+SECRET_KEY = "my_super_secret_key_for_ai_hub" # JWT 토큰 암호화 키
+
+
+
+
+
+
 app = FastAPI()
 
 # CORS 설정
@@ -255,3 +300,50 @@ def get_gateways():
         },
         "devices": gateways_db
     }
+
+
+# 🟢 [NEW] 로그인 API
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+@app.post("/login")
+def login(request: LoginRequest):
+    db = SessionLocal()
+    user = db.query(User).filter(User.username == request.username).first()
+    db.close()
+
+    # 계정이 없거나 비밀번호가 틀린 경우
+    if not user or not bcrypt.checkpw(request.password.encode('utf-8'), user.password_hash.encode('utf-8')):
+        return {"status": "error", "message": "아이디 또는 비밀번호가 올바르지 않습니다."}
+    
+    # 로그인 성공 시 JWT 토큰 발급
+    token = jwt.encode({"sub": user.username}, SECRET_KEY, algorithm="HS256")
+    return {"status": "success", "token": token, "username": user.username}
+
+
+
+# 🟢 [NEW] 회원가입 API
+class SignupRequest(BaseModel):
+    username: str
+    password: str
+
+@app.post("/signup")
+def signup(request: SignupRequest):
+    db = SessionLocal()
+    
+    # 1. 이미 존재하는 아이디인지 검사
+    existing_user = db.query(User).filter(User.username == request.username).first()
+    if existing_user:
+        db.close()
+        return {"status": "error", "message": "이미 사용 중인 아이디입니다."}
+    
+    # 2. 비밀번호 암호화 후 DB에 저장
+    hashed_pw = bcrypt.hashpw(request.password.encode('utf-8'), bcrypt.gensalt())
+    new_user = User(username=request.username, password_hash=hashed_pw.decode('utf-8'))
+    
+    db.add(new_user)
+    db.commit()
+    db.close()
+    
+    return {"status": "success", "message": "회원가입이 완료되었습니다. 로그인해 주세요."}
