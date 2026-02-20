@@ -2,10 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation'; // 🟢 라우터 추가
 import { 
   Search, SlidersHorizontal, Heart, Download, Activity, 
   Box, Terminal, Type, Image as ImageIcon, Mic, Database, Layers,
-  LayoutDashboard, ArrowRight 
+  LayoutDashboard, ArrowRight , LogOut
 } from 'lucide-react';
 
 // 데이터셋은 아직 DB 연동 전이므로 가짜 데이터 유지
@@ -23,6 +24,7 @@ const categories = [
 ];
 
 export default function Home() {
+  const router = useRouter(); // 🟢 라우터 활성화
   const [activeCategory, setActiveCategory] = useState("All");
   const [viewType, setViewType] = useState<'models' | 'datasets'>('models');
 
@@ -30,6 +32,13 @@ export default function Home() {
   const [models, setModels] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("username");
+    alert("안전하게 로그아웃 되었습니다.");
+    router.push("/login"); // 로그인 화면으로 쫓아냄
+  };
   // 🟢 [NEW] 백엔드에서 모델 목록 불러오기
   useEffect(() => {
     const fetchModels = async () => {
@@ -58,14 +67,20 @@ export default function Home() {
             <span>Platform</span>
         </div>
         
-        <Link 
-            href="/dashboard/models" 
-            className="flex items-center gap-2 px-5 py-2.5 bg-gray-900 text-white rounded-full font-medium text-sm hover:bg-gray-800 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
-        >
-            <LayoutDashboard size={16} />
-            Console / Dashboard
-            <ArrowRight size={16} className="opacity-50"/>
-        </Link>
+        {/* 🟢 [수정됨] 대시보드 버튼과 로그아웃 버튼을 나란히 배치 */}
+        <div className="flex items-center gap-4">
+            <button onClick={handleLogout} className="flex items-center gap-2 text-sm font-bold text-gray-500 hover:text-red-500 transition-colors">
+                <LogOut size={18} /> 로그아웃
+            </button>
+            <Link 
+                href="/dashboard/models" 
+                className="flex items-center gap-2 px-5 py-2.5 bg-gray-900 text-white rounded-full font-medium text-sm hover:bg-gray-800 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+            >
+                <LayoutDashboard size={16} />
+                Console
+                <ArrowRight size={16} className="opacity-50"/>
+            </Link>
+        </div>
       </nav>
 
       {/* Hero Section */}

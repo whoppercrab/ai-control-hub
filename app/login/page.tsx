@@ -2,120 +2,106 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Cpu, Lock, User, ArrowRight } from 'lucide-react';
+import { Box, Lock, User, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [formData, setFormData] = useState({ username: '', password: '' });
   const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+    setErrorMsg(''); // 입력할 때 에러 메시지 초기화
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError("");
 
     try {
-      const res = await fetch('http://localhost:8000/login', {
+      // 백엔드 로그인 API 호출
+      const res = await fetch('http://127.0.0.1:8000/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify(formData)
       });
-      
       const data = await res.json();
 
       if (data.status === "success") {
-        // 토큰을 브라우저에 저장하고 대시보드로 이동
+        // 🟢 로그인 성공! 토큰과 유저 이름을 로컬 스토리지에 저장 (이게 통행증입니다!)
         localStorage.setItem("token", data.token);
         localStorage.setItem("username", data.username);
-        router.push('/dashboard');
+        
+        // 홈 화면으로 이동
+        router.push('/');
       } else {
-        setError(data.message);
+        setErrorMsg(data.message); // "아이디 또는 비밀번호가 틀렸습니다" 등
       }
     } catch (err) {
-      setError("서버와 연결할 수 없습니다. 백엔드가 켜져있나요?");
+      setErrorMsg("서버와 연결할 수 없습니다.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="max-w-md w-full bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-100">
+    <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center px-4 animate-fade-in">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
         
-        {/* 헤더 영역 */}
-        <div className="bg-[#111827] px-8 pt-10 pb-8 text-center">
-          <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-500/30">
-            <Cpu size={32} className="text-white"/>
+        {/* 로고 & 타이틀 */}
+        <div className="text-center mb-8">
+          <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center text-white mx-auto mb-4 shadow-lg shadow-blue-500/30">
+            <Box size={24} />
           </div>
-          <h2 className="text-2xl font-bold text-white mb-1">AI Control Hub</h2>
-          <p className="text-gray-400 text-sm">관리자 시스템에 로그인하세요</p>
+          <h2 className="text-2xl font-extrabold text-gray-900">AI Platform 로그인</h2>
+          <p className="text-sm text-gray-500 mt-2">서비스를 이용하려면 로그인이 필요합니다.</p>
         </div>
 
-        {/* 폼 영역 */}
-        <div className="p-8">
-          <form onSubmit={handleLogin} className="space-y-6">
-            
-            {/* 아이디 입력 */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Username</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <User size={18} className="text-gray-400"/>
-                </div>
-                <input 
-                  type="text" 
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                  placeholder="admin"
-                  required
-                />
+        {/* 로그인 폼 */}
+        <form onSubmit={handleLogin} className="space-y-5">
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-1">Username</label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <User size={18} className="text-gray-400" />
               </div>
+              <input 
+                type="text" name="username" required value={formData.username} onChange={handleChange}
+                className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                placeholder="아이디를 입력하세요"
+              />
             </div>
-
-            {/* 비밀번호 입력 */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Password</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock size={18} className="text-gray-400"/>
-                </div>
-                <input 
-                  type="password" 
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                  placeholder="••••••••"
-                  required
-                />
-              </div>
-            </div>
-
-            {/* 에러 메시지 */}
-            {error && <div className="text-red-500 text-sm font-medium text-center">{error}</div>}
-
-            {/* 로그인 버튼 */}
-            <button 
-              type="submit" 
-              disabled={loading}
-              className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-blue-500/30 disabled:bg-gray-400"
-            >
-              {loading ? "로그인 중..." : "Sign In"}
-              {!loading && <ArrowRight size={18}/>}
-            </button>
-          </form>
-            {/* 🟢 [NEW] 회원가입 페이지 이동 링크 추가 */}
-          <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600">
-              계정이 없으신가요? <Link href="/signup" className="text-blue-600 font-bold hover:underline">회원가입하기</Link>
-            </p>
           </div>
-          
-        </div>
 
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-1">Password</label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Lock size={18} className="text-gray-400" />
+              </div>
+              <input 
+                type="password" name="password" required value={formData.password} onChange={handleChange}
+                className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                placeholder="비밀번호를 입력하세요"
+              />
+            </div>
+          </div>
+
+          {errorMsg && <p className="text-red-500 text-sm font-bold text-center">{errorMsg}</p>}
+
+          <button 
+            type="submit" disabled={loading}
+            className="w-full flex items-center justify-center gap-2 py-3.5 bg-gray-900 text-white font-bold rounded-xl hover:bg-gray-800 transition-all disabled:bg-gray-400 mt-2"
+          >
+            {loading ? "로그인 중..." : "로그인"} <ArrowRight size={18} />
+          </button>
+        </form>
+
+        <div className="mt-6 text-center text-sm text-gray-500 border-t border-gray-100 pt-6">
+          계정이 없으신가요? <Link href="/signup" className="text-blue-600 font-bold hover:underline">회원가입</Link>
+        </div>
       </div>
     </div>
   );
