@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Cpu, Lock, User, ArrowRight } from 'lucide-react';
+import Link from 'next/link';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -109,7 +110,7 @@ export default function LoginPage() {
             {/* 🟢 [NEW] 회원가입 페이지 이동 링크 추가 */}
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600">
-              계정이 없으신가요? <link href="/signup" className="text-blue-600 font-bold hover:underline">회원가입하기</link>
+              계정이 없으신가요? <Link href="/signup" className="text-blue-600 font-bold hover:underline">회원가입하기</Link>
             </p>
           </div>
           

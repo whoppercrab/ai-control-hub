@@ -50,3 +50,6 @@ models/*.pt
 models/*.bin
 data/
 *.pth
+
+# Uploaded Model Files & Local Storage
+storage/

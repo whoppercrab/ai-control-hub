@@ -1,29 +1,18 @@
 "use client";
 
-import React, { useState } from 'react';
-import { ArrowDownToLine, Check, Copy, FileText, FileJson, FileCode, Database, Terminal, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ArrowDownToLine, Database, FileJson, FileText, Terminal, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import 'highlight.js/styles/github-dark.css';
 
-// 컴포넌트 불러오기
-import ModelHeader from './components/ModelHeader';
-import ModelSidebar from './components/ModelSidebar';
-import CommunityTab from './components/CommunityTab';
+// 🟢 잘 분리해두셨던 컴포넌트들 불러오기
+import ModelHeader from './[modelName]/components/ModelHeader';
+import ModelSidebar from './[modelName]/components/ModelSidebar';
+import DiscussionBoard from '../components/DiscussionBoard';
 
-// 데이터 정의
-const modelData = {
-  name: "bert-base-korean-v1",
-  author: "kykim",
-  lastUpdated: "5 days ago",
-  downloads: "1,240,500",
-  likes: 342,
-  license: "apache-2.0",
-  tags: ["PyTorch", "Transformers", "bert", "ko", "nlp"],
-  readme: `# BERT Base Korean Model\n이 모델은 **Next.js** 컴포넌트로 분리되었습니다.\n\n\`\`\`python\nprint("Refactoring Complete!")\n\`\`\``
-};
-
+// 파일 목록은 일단 시각적 요소를 위해 하드코딩 유지 (추후 DB 연동 가능)
 const fileList = [
   { name: "config.json", size: "1.2 KB", date: "2 days ago", type: "json", lfs: false },
   { name: "pytorch_model.bin", size: "420 MB", date: "2 days ago", type: "bin", lfs: true },
@@ -33,10 +22,32 @@ const fileList = [
 export default function ModelPage() {
   const [activeTab, setActiveTab] = useState("card");
   const [showModal, setShowModal] = useState(false);
-  const [isCopied, setIsCopied] = useState(false);
   const [toast, setToast] = useState({ show: false, msg: '' });
+  
+  // 🟢 [핵심] DB에서 가져올 모델 데이터 그릇
+  const [modelData, setModelData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-  // 헬퍼 함수들 (파일 아이콘, 복사, 다운로드)
+  // 🟢 DB에서 모델 상세 정보 불러오기
+  useEffect(() => {
+    const fetchModelData = async () => {
+      try {
+        const res = await fetch('http://localhost:8000/models/bert-base-korean-v1');
+        const result = await res.json();
+        
+        if (result.status === "success") {
+          setModelData(result.data); // 가짜 데이터가 아닌, 진짜 백엔드 데이터를 세팅!
+        }
+      } catch (error) {
+        console.error("데이터를 불러오는데 실패했습니다.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchModelData();
+  }, []);
+
   const getFileIcon = (type: string) => {
     switch (type) {
       case 'json': return <FileJson size={18} className="text-yellow-600"/>;
@@ -50,25 +61,32 @@ export default function ModelPage() {
     setTimeout(() => setToast({ show: false, msg: '' }), 3000);
   };
 
+  // 로딩 및 에러 처리 화면
+  if (loading) return <div className="min-h-screen flex justify-center items-center"><div className="animate-pulse text-lg font-bold text-gray-500">모델 정보를 불러오는 중입니다...</div></div>;
+  if (!modelData) return <div className="min-h-screen flex justify-center items-center text-red-500 font-bold">모델을 찾을 수 없습니다.</div>;
+
   return (
     <div className="min-h-screen bg-white text-gray-900 font-sans relative">
       
-      {/* 1. 헤더 컴포넌트 사용 */}
+      {/* 1. 헤더 영역 (DB 데이터 전달) */}
       <ModelHeader modelData={modelData} activeTab={activeTab} setActiveTab={setActiveTab} />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           
           <div className="lg:col-span-8">
-            {/* 탭 내용들 */}
+            {/* 탭 1: 모델 카드 (마크다운) */}
             {activeTab === 'card' && (
-              <article className="prose prose-slate max-w-none">
-                <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>{modelData.readme}</ReactMarkdown>
+              <article className="prose prose-slate max-w-none animate-fade-in">
+                <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
+                  {modelData.readme}
+                </ReactMarkdown>
               </article>
             )}
 
+            {/* 탭 2: 파일 목록 */}
             {activeTab === 'files' && (
-              <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+              <div className="border border-gray-200 rounded-lg overflow-hidden bg-white animate-fade-in">
                 {fileList.map((file, idx) => (
                   <div key={idx} className="flex justify-between items-center p-3 border-b hover:bg-gray-50">
                     <div className="flex items-center gap-3">
@@ -84,18 +102,22 @@ export default function ModelPage() {
               </div>
             )}
 
-            {/* 2. 커뮤니티 컴포넌트 사용 (깔끔!) */}
-            {activeTab === 'community' && <CommunityTab />}
+            {/* 탭 3: 커뮤니티 (DB 연동 완료) */}
+            {activeTab === 'community' && (
+              <div className="animate-fade-in">
+                <DiscussionBoard targetType="model" targetId={modelData.name} />
+              </div>
+            )}
           </div>
 
           <div className="lg:col-span-4">
-            {/* 3. 사이드바 컴포넌트 사용 */}
+            {/* 2. 사이드바 영역 (DB 데이터 전달) */}
             <ModelSidebar modelData={modelData} onOpenModal={() => setShowModal(true)} />
           </div>
         </div>
       </main>
 
-      {/* 모달 및 토스트 (Global UI) */}
+      {/* 모달 팝업 */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setShowModal(false)}>
            <div className="bg-white p-6 rounded-2xl w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
@@ -105,6 +127,7 @@ export default function ModelPage() {
         </div>
       )}
       
+      {/* 토스트 알림 */}
       {toast.show && (
         <div className="fixed bottom-10 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 animate-bounce-in z-50">
            <ArrowDownToLine size={20} className="text-green-400"/> <span className="font-medium">{toast.msg}</span>
