@@ -65,6 +65,18 @@ class AIModel(Base):
     readme = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+class Dataset(Base):
+    __tablename__ = "datasets"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, index=True)
+    author = Column(String)
+    downloads = Column(String, default="0")
+    likes = Column(Integer, default=0)
+    license = Column(String)
+    tags = Column(String) 
+    readme = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
 Base.metadata.create_all(bind=engine)
 
 # ==========================================
@@ -275,14 +287,7 @@ def get_model(model_name: str):
     }
 
 # --- 데이터셋 및 게이트웨이 모니터링 ---
-datasets_db = [
-    {"id": 1, "name": "COCO 2017", "source": "Common Objects in Context", "size": "25 GB", "type": "Image (Vision)", "status": "Ready", "date": "2024-01-15"},
-    {"id": 2, "name": "UCI Machine Learning", "source": "UCI Repository", "size": "1.2 GB", "type": "Tabular", "status": "Ready", "date": "2023-11-20"}
-]
 
-@app.get("/datasets")
-def get_datasets():
-    return datasets_db
 
 class DatasetItem(BaseModel):
     name: str; source: str; type: str
@@ -419,4 +424,119 @@ def download_model_file(model_name: str, file_name: str):
         return {"status": "error", "message": "파일을 찾을 수 없습니다."}
     
     # 브라우저가 파일을 다운로드하도록 응답
+    return FileResponse(path=file_path, filename=file_name)
+
+
+
+
+
+
+# ==========================================
+# 🟢 데이터셋 (Datasets) 통합 관리 API
+# ==========================================
+class DatasetCreate(BaseModel):
+    name: str
+    author: str
+    license: str
+    tags: str
+    readme: str
+
+@app.post("/datasets")
+def create_dataset(dataset: DatasetCreate):
+    db = SessionLocal()
+    existing = db.query(Dataset).filter(Dataset.name == dataset.name).first()
+    if existing:
+        db.close()
+        return {"status": "error", "message": "이미 사용 중인 데이터셋 이름입니다."}
+    
+    new_dataset = Dataset(
+        name=dataset.name, author=dataset.author, license=dataset.license,
+        tags=dataset.tags, readme=dataset.readme, downloads="0", likes=0
+    )
+    db.add(new_dataset)
+    db.commit()
+    db.close()
+    return {"status": "success", "message": "새 데이터셋이 성공적으로 등록되었습니다."}
+
+@app.get("/datasets")
+def get_all_datasets():
+    db = SessionLocal()
+    datasets = db.query(Dataset).order_by(Dataset.created_at.desc()).all()
+    db.close()
+    
+    result = []
+    for d in datasets:
+        result.append({
+            "id": d.id,
+            "name": d.name,
+            "author": d.author,
+            "size": "0 MB", # 추후 파일 연동
+            "type": "Dataset",
+            "created_at": d.created_at.strftime("%Y-%m-%d %H:%M")
+        })
+    return {"status": "success", "data": result}
+
+@app.get("/datasets/{dataset_name}")
+def get_dataset(dataset_name: str):
+    db = SessionLocal()
+    dataset = db.query(Dataset).filter(Dataset.name == dataset_name).first()
+    db.close()
+    
+    if not dataset:
+        return {"status": "error", "message": "데이터셋을 찾을 수 없습니다."}
+        
+    return {
+        "status": "success",
+        "data": {
+            "name": dataset.name, "author": dataset.author, "downloads": dataset.downloads,
+            "likes": dataset.likes, "license": dataset.license,
+            "tags": dataset.tags.split(",") if dataset.tags else [], "readme": dataset.readme
+        }
+    }
+
+@app.post("/datasets/{dataset_name}/upload")
+async def upload_dataset_files(dataset_name: str, files: List[UploadFile] = File(...)):
+    # 모델은 storage/models 였지만, 데이터셋은 storage/datasets 에 저장합니다!
+    save_dir = f"./storage/datasets/{dataset_name}"
+    os.makedirs(save_dir, exist_ok=True)
+    
+    uploaded_files = []
+    for file in files:
+        file_path = os.path.join(save_dir, file.filename)
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        uploaded_files.append(file.filename)
+        
+    return {"status": "success", "message": f"{len(uploaded_files)}개의 파일이 업로드되었습니다.", "files": uploaded_files}
+
+@app.get("/datasets/{dataset_name}/files")
+def get_dataset_files(dataset_name: str):
+    target_dir = f"./storage/datasets/{dataset_name}"
+    if not os.path.exists(target_dir):
+        return {"status": "success", "data": []}
+        
+    files_info = []
+    for f in os.listdir(target_dir):
+        filepath = os.path.join(target_dir, f)
+        if os.path.isfile(filepath):
+            size_bytes = os.path.getsize(filepath)
+            size_str = f"{size_bytes / 1024:.1f} KB" if size_bytes < 1024 * 1024 else f"{size_bytes / (1024 * 1024):.1f} MB"
+            
+            # 데이터셋에 흔한 확장자들 아이콘 처리를 위해 분류
+            file_type = "csv" if f.endswith(".csv") else "json" if f.endswith(".json") else "zip" if f.endswith(".zip") else "text"
+            
+            files_info.append({
+                "name": f,
+                "size": size_str,
+                "type": file_type,
+                "lfs": size_bytes > 50 * 1024 * 1024
+            })
+            
+    return {"status": "success", "data": files_info}
+
+@app.get("/datasets/{dataset_name}/files/{file_name}")
+def download_dataset_file(dataset_name: str, file_name: str):
+    file_path = f"./storage/datasets/{dataset_name}/{file_name}"
+    if not os.path.exists(file_path):
+        return {"status": "error", "message": "파일을 찾을 수 없습니다."}
     return FileResponse(path=file_path, filename=file_name)

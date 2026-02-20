@@ -2,19 +2,14 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation'; // 🟢 라우터 추가
+import { useRouter } from 'next/navigation';
 import { 
   Search, SlidersHorizontal, Heart, Download, Activity, 
   Box, Terminal, Type, Image as ImageIcon, Mic, Database, Layers,
   LayoutDashboard, ArrowRight , LogOut
 } from 'lucide-react';
 
-// 데이터셋은 아직 DB 연동 전이므로 가짜 데이터 유지
-const trendingDatasets = [
-  { id: 101, author: "nsmc", name: "naver-sentiment-movie-corpus", size: "30MB", likes: 1200, downloads: "500k", updated: "1 year ago", type: "nlp" },
-  { id: 102, author: "squad_kor_v1", name: "squad_kor_v1", size: "15MB", likes: 850, downloads: "200k", updated: "2 years ago", type: "nlp" },
-  { id: 103, author: "coco", name: "coco-2017", size: "25GB", likes: 5400, downloads: "1.5M", updated: "3 months ago", type: "vision" },
-];
+// 🟢 가짜 데이터(trendingDatasets)는 이제 필요 없으니 삭제했습니다!
 
 const categories = [
   { label: "All", icon: Layers },
@@ -24,37 +19,39 @@ const categories = [
 ];
 
 export default function Home() {
-  const router = useRouter(); // 🟢 라우터 활성화
+  const router = useRouter(); 
   const [activeCategory, setActiveCategory] = useState("All");
   const [viewType, setViewType] = useState<'models' | 'datasets'>('models');
 
-  // 🟢 [NEW] DB에서 불러온 진짜 모델을 담을 상태
   const [models, setModels] = useState<any[]>([]);
+  const [datasets, setDatasets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-
 
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("username");
     alert("안전하게 로그아웃 되었습니다.");
-    router.push("/login"); // 로그인 화면으로 쫓아냄
+    router.push("/login"); 
   };
-  // 🟢 [NEW] 백엔드에서 모델 목록 불러오기
+
   useEffect(() => {
-    const fetchModels = async () => {
+    const fetchData = async () => {
       try {
-        const res = await fetch('http://localhost:8000/models');
-        const result = await res.json();
-        if (result.status === "success") {
-          setModels(result.data); // 진짜 데이터 저장
-        }
+        const resModels = await fetch('http://127.0.0.1:8000/models');
+        const dataModels = await resModels.json();
+        if (dataModels.status === "success") setModels(dataModels.data);
+
+        const resDatasets = await fetch('http://127.0.0.1:8000/datasets');
+        const dataDatasets = await resDatasets.json();
+        if (dataDatasets.status === "success") setDatasets(dataDatasets.data);
+
       } catch (error) {
-        console.error("모델 데이터를 불러오는데 실패했습니다.");
+        console.error("데이터를 불러오는데 실패했습니다.", error);
       } finally {
         setLoading(false);
       }
     };
-    fetchModels();
+    fetchData();
   }, []);
 
   return (
@@ -67,7 +64,6 @@ export default function Home() {
             <span>Platform</span>
         </div>
         
-        {/* 🟢 [수정됨] 대시보드 버튼과 로그아웃 버튼을 나란히 배치 */}
         <div className="flex items-center gap-4">
             <button onClick={handleLogout} className="flex items-center gap-2 text-sm font-bold text-gray-500 hover:text-red-500 transition-colors">
                 <LogOut size={18} /> 로그아웃
@@ -111,8 +107,9 @@ export default function Home() {
                 <button onClick={() => setViewType('models')} className={`flex items-center gap-2 pb-2 text-lg font-bold border-b-2 transition-all ${viewType === 'models' ? "border-blue-600 text-gray-900" : "border-transparent text-gray-400 hover:text-gray-600"}`}>
                     <Box size={20} /> Models <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full text-gray-500 font-normal">{models.length}</span>
                 </button>
+                {/* 🟢 하드코딩된 숫자 '3' 대신 진짜 datasets.length로 변경! */}
                 <button onClick={() => setViewType('datasets')} className={`flex items-center gap-2 pb-2 text-lg font-bold border-b-2 transition-all ${viewType === 'datasets' ? "border-red-500 text-gray-900" : "border-transparent text-gray-400 hover:text-gray-600"}`}>
-                    <Database size={20} /> Datasets <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full text-gray-500 font-normal">3</span>
+                    <Database size={20} /> Datasets <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full text-gray-500 font-normal">{datasets.length}</span>
                 </button>
             </div>
             {/* 카테고리 필터 */}
@@ -128,16 +125,17 @@ export default function Home() {
         {/* 그리드 리스트 */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
             
-            {/* 모델 탭 로딩 중 */}
-            {viewType === 'models' && loading && (
+            {/* 로딩 중 메시지 */}
+            {loading && (
                 <div className="col-span-full py-20 text-center text-gray-400 font-bold animate-pulse">
-                    데이터베이스에서 모델을 불러오는 중입니다...
+                    데이터베이스에서 정보를 불러오는 중입니다...
                 </div>
             )}
 
-            {/* 🟢 진짜 DB 모델 데이터 렌더링 */}
+            {/* 모델 렌더링 */}
             {viewType === 'models' && !loading && models.map((model) => (
                 <Link href={`/model/${model.name}`} key={model.id} className="group block">
+                    {/* ... (기존 모델 카드 UI 유지) ... */}
                     <div className="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-md transition-all hover:border-blue-300 h-full flex flex-col">
                         <div className="flex items-start justify-between mb-4">
                             <div className="flex items-center gap-3 overflow-hidden">
@@ -166,9 +164,10 @@ export default function Home() {
                 </Link>
             ))}
 
-            {/* 데이터셋 가짜 데이터 렌더링 (유지) */}
-            {viewType === 'datasets' && trendingDatasets.map((dataset) => (
-                <div key={dataset.id} className="group block cursor-pointer">
+            {/* 🟢 진짜 DB 데이터셋 렌더링으로 전면 교체! */}
+            {viewType === 'datasets' && !loading && datasets.map((dataset) => (
+                // Link를 적용해서 클릭하면 상세 페이지로 이동하도록 설정
+                <Link href={`/dataset/${dataset.name}`} key={dataset.id} className="group block cursor-pointer">
                     <div className="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-md transition-all hover:border-red-300 h-full flex flex-col">
                         <div className="flex items-start justify-between mb-4">
                             <div className="flex items-center gap-3 overflow-hidden">
@@ -182,16 +181,26 @@ export default function Home() {
                             </div>
                         </div>
                         <div className="mb-6 flex-1 flex gap-2">
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200"><Database size={12}/> {dataset.size}</span>
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200 uppercase">{dataset.type}</span>
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200"><Database size={12}/> {dataset.size || "0 MB"}</span>
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200 uppercase">{dataset.type || "Dataset"}</span>
                         </div>
                         <div className="flex items-center justify-between text-xs text-gray-500 pt-4 border-t border-gray-50">
-                            <div className="flex gap-4"><span className="flex items-center gap-1"><Activity size={12}/> {dataset.updated}</span><span className="flex items-center gap-1"><Download size={12}/> {dataset.downloads}</span></div>
-                            <span className="flex items-center gap-1 font-medium hover:text-red-500"><Heart size={12}/> {dataset.likes}</span>
+                            <div className="flex gap-4">
+                              <span className="flex items-center gap-1"><Activity size={12}/> {dataset.created_at}</span>
+                              <span className="flex items-center gap-1"><Download size={12}/> {dataset.downloads || 0}</span>
+                            </div>
+                            <span className="flex items-center gap-1 font-medium hover:text-red-500"><Heart size={12}/> {dataset.likes || 0}</span>
                         </div>
                     </div>
-                </div>
+                </Link>
             ))}
+            
+            {/* 데이터가 하나도 없을 때 보여줄 화면 */}
+            {viewType === 'datasets' && !loading && datasets.length === 0 && (
+                <div className="col-span-full py-20 text-center text-gray-400 font-medium">
+                    아직 등록된 데이터셋이 없습니다.
+                </div>
+            )}
         </div>
       </main>
 
