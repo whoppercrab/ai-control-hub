@@ -29,24 +29,24 @@ export default function ModelPage() {
   const [loading, setLoading] = useState(true);
 
   // 🟢 DB에서 모델 상세 정보 불러오기
-  useEffect(() => {
-    const fetchModelData = async () => {
-      try {
-        const res = await fetch('http://localhost:8000/models/bert-base-korean-v1');
-        const result = await res.json();
+  // useEffect(() => {
+  //   const fetchModelData = async () => {
+  //     try {
+  //       const res = await fetch('http://localhost:8000/models/bert-base-korean-v1');
+  //       const result = await res.json();
         
-        if (result.status === "success") {
-          setModelData(result.data); // 가짜 데이터가 아닌, 진짜 백엔드 데이터를 세팅!
-        }
-      } catch (error) {
-        console.error("데이터를 불러오는데 실패했습니다.");
-      } finally {
-        setLoading(false);
-      }
-    };
+  //       if (result.status === "success") {
+  //         setModelData(result.data); // 가짜 데이터가 아닌, 진짜 백엔드 데이터를 세팅!
+  //       }
+  //     } catch (error) {
+  //       console.error("데이터를 불러오는데 실패했습니다.");
+  //     } finally {
+  //       setLoading(false);
+  //     }
+  //   };
 
-    fetchModelData();
-  }, []);
+  //   fetchModelData();
+  // }, []);
 
   const getFileIcon = (type: string) => {
     switch (type) {

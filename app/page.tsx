@@ -27,6 +27,23 @@ export default function Home() {
   const [datasets, setDatasets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+
+
+
+  // 🟢 [NEW] 1. 검색어를 저장할 그릇 만들기
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // 🟢 [NEW] 2. 검색어에 맞춰 데이터 걸러내기 (이름 또는 작성자에 검색어가 포함되어 있는지 대소문자 무시하고 검사)
+  const filteredModels = models.filter((model) => 
+    model.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    model.author.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const filteredDatasets = datasets.filter((dataset) => 
+    dataset.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    dataset.author.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("username");
@@ -95,7 +112,13 @@ export default function Home() {
             <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
               <Search className="text-gray-400 group-focus-within:text-blue-600 transition-colors" size={20} />
             </div>
-            <input type="text" className="w-full pl-12 pr-4 py-4 text-lg border-2 border-gray-200 rounded-full focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all shadow-sm" placeholder="모델, 데이터셋, 사용자 검색..." />
+            <input 
+                type="text" 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-12 pr-4 py-4 text-lg border-2 border-gray-200 rounded-full focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all shadow-sm" 
+                placeholder="모델, 데이터셋, 사용자 검색..." 
+            />
           </div>
         </div>
       </section>
@@ -105,11 +128,11 @@ export default function Home() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 border-b border-gray-200 pb-2">
             <div className="flex gap-6">
                 <button onClick={() => setViewType('models')} className={`flex items-center gap-2 pb-2 text-lg font-bold border-b-2 transition-all ${viewType === 'models' ? "border-blue-600 text-gray-900" : "border-transparent text-gray-400 hover:text-gray-600"}`}>
-                    <Box size={20} /> Models <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full text-gray-500 font-normal">{models.length}</span>
+                    <Box size={20} /> Models <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full text-gray-500 font-normal">{filteredModels.length}</span>
                 </button>
                 {/* 🟢 하드코딩된 숫자 '3' 대신 진짜 datasets.length로 변경! */}
                 <button onClick={() => setViewType('datasets')} className={`flex items-center gap-2 pb-2 text-lg font-bold border-b-2 transition-all ${viewType === 'datasets' ? "border-red-500 text-gray-900" : "border-transparent text-gray-400 hover:text-gray-600"}`}>
-                    <Database size={20} /> Datasets <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full text-gray-500 font-normal">{datasets.length}</span>
+                    <Database size={20} /> Datasets <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full text-gray-500 font-normal">{filteredDatasets.length}</span>
                 </button>
             </div>
             {/* 카테고리 필터 */}
@@ -132,74 +155,86 @@ export default function Home() {
                 </div>
             )}
 
-            {/* 모델 렌더링 */}
-            {viewType === 'models' && !loading && models.map((model) => (
-                <Link href={`/model/${model.name}`} key={model.id} className="group block">
-                    {/* ... (기존 모델 카드 UI 유지) ... */}
-                    <div className="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-md transition-all hover:border-blue-300 h-full flex flex-col">
-                        <div className="flex items-start justify-between mb-4">
-                            <div className="flex items-center gap-3 overflow-hidden">
-                                <div className="w-10 h-10 min-w-[40px] bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg flex items-center justify-center text-gray-500 group-hover:text-blue-600 group-hover:from-blue-50 group-hover:to-blue-100 transition-colors">
-                                    <Box size={20} />
-                                </div>
-                                <div className="truncate">
-                                    <h3 className="font-bold text-gray-900 truncate group-hover:text-blue-600 group-hover:underline decoration-blue-600 decoration-2 underline-offset-2">{model.name}</h3>
-                                    <p className="text-sm text-gray-500">{model.author}</p>
-                                </div>
+            {/* 🟦 모델 카드 렌더링 (파란색 테마) */}
+            {viewType === 'models' && !loading && filteredModels.map((model) => (
+                <Link href={`/model/${model.name}`} key={model.id} className="group block h-full cursor-pointer">
+                    <div className="bg-white border border-gray-200 rounded-2xl p-6 hover:shadow-xl transition-all hover:border-blue-300 h-full flex flex-col">
+                        {/* 헤더: 아이콘 + 제목 + 작성자 */}
+                        <div className="flex items-start gap-4 mb-4">
+                            <div className="w-12 h-12 shrink-0 bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200 rounded-xl flex items-center justify-center text-gray-500 group-hover:text-blue-600 group-hover:from-blue-50 group-hover:to-blue-100 group-hover:border-blue-200 transition-all shadow-sm">
+                                <Box size={24} />
+                            </div>
+                            <div className="overflow-hidden pt-1">
+                                <h3 className="font-extrabold text-gray-900 text-lg truncate group-hover:text-blue-600 transition-colors">{model.name}</h3>
+                                <p className="text-sm font-medium text-gray-500 truncate">{model.author}</p>
                             </div>
                         </div>
-                        <div className="mb-6 flex-1">
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200">
-                            <Terminal size={12}/> AI Model
-                          </span>
+                        
+                        {/* 중간: 뱃지 정보 */}
+                        <div className="mb-6 flex-1 flex flex-wrap gap-2">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-gray-50 text-gray-600 border border-gray-200">
+                                <Terminal size={14}/> {model.type || "AI Model"}
+                            </span>
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-gray-50 text-gray-600 border border-gray-200">
+                                <Box size={14}/> {model.size || "Unknown"}
+                            </span>
                         </div>
-                        <div className="flex items-center justify-between text-xs text-gray-500 pt-4 border-t border-gray-50">
-                            <div className="flex gap-4">
-                              <span className="flex items-center gap-1"><Activity size={12}/> {model.created_at}</span>
-                              <span className="flex items-center gap-1"><Download size={12}/> 0</span>
+                        
+                        {/* 하단: 통계 정보 */}
+                        <div className="flex items-center justify-between text-xs font-semibold text-gray-500 pt-4 border-t border-gray-100">
+                            <div className="flex items-center gap-4">
+                              <span className="flex items-center gap-1.5"><Activity size={14}/> {model.created_at?.split(' ')[0] || "Just now"}</span>
+                              <span className="flex items-center gap-1.5"><Download size={14}/> {model.downloads || 0}</span>
                             </div>
-                            <span className="flex items-center gap-1 font-medium hover:text-red-500"><Heart size={12}/> 0</span>
+                            <span className="flex items-center gap-1.5 hover:text-red-500 transition-colors"><Heart size={14}/> {model.likes || 0}</span>
                         </div>
                     </div>
                 </Link>
             ))}
 
-            {/* 🟢 진짜 DB 데이터셋 렌더링으로 전면 교체! */}
-            {viewType === 'datasets' && !loading && datasets.map((dataset) => (
-                // Link를 적용해서 클릭하면 상세 페이지로 이동하도록 설정
-                <Link href={`/dataset/${dataset.name}`} key={dataset.id} className="group block cursor-pointer">
-                    <div className="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-md transition-all hover:border-red-300 h-full flex flex-col">
-                        <div className="flex items-start justify-between mb-4">
-                            <div className="flex items-center gap-3 overflow-hidden">
-                                <div className="w-10 h-10 min-w-[40px] bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg flex items-center justify-center text-gray-500 group-hover:text-red-600 group-hover:from-red-50 group-hover:to-red-100 transition-colors">
-                                    <Database size={20} />
-                                </div>
-                                <div className="truncate">
-                                    <h3 className="font-bold text-gray-900 truncate group-hover:text-red-600 group-hover:underline decoration-red-600 decoration-2 underline-offset-2">{dataset.name}</h3>
-                                    <p className="text-sm text-gray-500">{dataset.author}</p>
-                                </div>
+            {/* 🟥 데이터셋 카드 렌더링 (빨간색 테마) */}
+            {viewType === 'datasets' && !loading && filteredDatasets.map((dataset) => (
+                <Link href={`/dataset/${dataset.name}`} key={dataset.id} className="group block h-full cursor-pointer">
+                    <div className="bg-white border border-gray-200 rounded-2xl p-6 hover:shadow-xl transition-all hover:border-red-300 h-full flex flex-col">
+                        {/* 헤더: 아이콘 + 제목 + 작성자 */}
+                        <div className="flex items-start gap-4 mb-4">
+                            <div className="w-12 h-12 shrink-0 bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200 rounded-xl flex items-center justify-center text-gray-500 group-hover:text-red-600 group-hover:from-red-50 group-hover:to-red-100 group-hover:border-red-200 transition-all shadow-sm">
+                                <Database size={24} />
+                            </div>
+                            <div className="overflow-hidden pt-1">
+                                <h3 className="font-extrabold text-gray-900 text-lg truncate group-hover:text-red-600 transition-colors">{dataset.name}</h3>
+                                <p className="text-sm font-medium text-gray-500 truncate">{dataset.author}</p>
                             </div>
                         </div>
-                        <div className="mb-6 flex-1 flex gap-2">
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200"><Database size={12}/> {dataset.size || "0 MB"}</span>
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200 uppercase">{dataset.type || "Dataset"}</span>
+                        
+                        {/* 중간: 뱃지 정보 */}
+                        <div className="mb-6 flex-1 flex flex-wrap gap-2">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-gray-50 text-gray-600 border border-gray-200">
+                                <Database size={14}/> {dataset.type || "Dataset"}
+                            </span>
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-gray-50 text-gray-600 border border-gray-200">
+                                <Database size={14}/> {dataset.size || "0 MB"}
+                            </span>
                         </div>
-                        <div className="flex items-center justify-between text-xs text-gray-500 pt-4 border-t border-gray-50">
-                            <div className="flex gap-4">
-                              <span className="flex items-center gap-1"><Activity size={12}/> {dataset.created_at}</span>
-                              <span className="flex items-center gap-1"><Download size={12}/> {dataset.downloads || 0}</span>
+                        
+                        {/* 하단: 통계 정보 */}
+                        <div className="flex items-center justify-between text-xs font-semibold text-gray-500 pt-4 border-t border-gray-100">
+                            <div className="flex items-center gap-4">
+                              <span className="flex items-center gap-1.5"><Activity size={14}/> {dataset.created_at?.split(' ')[0] || "Just now"}</span>
+                              <span className="flex items-center gap-1.5"><Download size={14}/> {dataset.downloads || 0}</span>
                             </div>
-                            <span className="flex items-center gap-1 font-medium hover:text-red-500"><Heart size={12}/> {dataset.likes || 0}</span>
+                            <span className="flex items-center gap-1.5 hover:text-red-500 transition-colors"><Heart size={14}/> {dataset.likes || 0}</span>
                         </div>
                     </div>
                 </Link>
             ))}
             
             {/* 데이터가 하나도 없을 때 보여줄 화면 */}
-            {viewType === 'datasets' && !loading && datasets.length === 0 && (
-                <div className="col-span-full py-20 text-center text-gray-400 font-medium">
-                    아직 등록된 데이터셋이 없습니다.
-                </div>
+            {viewType === 'datasets' && !loading && filteredDatasets.length === 0 && (
+                  <div className="col-span-full py-20 text-center text-gray-400 font-medium">검색 결과가 없습니다.</div>
+            )}
+            {viewType === 'models' && !loading && filteredModels.length === 0 && (
+                  <div className="col-span-full py-20 text-center text-gray-400 font-medium">검색 결과가 없습니다.</div>
             )}
         </div>
       </main>

@@ -64,6 +64,7 @@ class AIModel(Base):
     tags = Column(String) 
     readme = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
+    liked_by = Column(String, default="")
 
 class Dataset(Base):
     __tablename__ = "datasets"
@@ -76,6 +77,7 @@ class Dataset(Base):
     tags = Column(String) 
     readme = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
+    liked_by = Column(String, default="")
 
 Base.metadata.create_all(bind=engine)
 
@@ -189,6 +191,49 @@ async def run_real_training(epochs: int, batch_size: int, lr: float):
         training_state["is_training"] = False
 
 
+# 🟢 [NEW] 실제 폴더 용량과 타입을 계산하는 마법의 함수!
+def get_real_file_info(target_dir, default_type):
+    if not os.path.exists(target_dir):
+        return "0 MB", default_type
+        
+    total_size = 0
+    largest_ext = ""
+    max_size = 0
+    
+    # 폴더 안의 모든 파일을 뒤져서 총 용량과 가장 큰 파일의 확장자를 찾습니다.
+    for f in os.listdir(target_dir):
+        fp = os.path.join(target_dir, f)
+        if os.path.isfile(fp):
+            sz = os.path.getsize(fp)
+            total_size += sz
+            if sz > max_size:
+                max_size = sz
+                largest_ext = os.path.splitext(f)[1].lower()
+                
+    # 1. 예쁜 용량 텍스트로 변환 (KB, MB, GB)
+    if total_size == 0:
+        size_str = "0 MB"
+    elif total_size < 1024 * 1024:
+        size_str = f"{total_size / 1024:.1f} KB"
+    elif total_size < 1024 * 1024 * 1024:
+        size_str = f"{total_size / (1024 * 1024):.1f} MB"
+    else:
+        size_str = f"{total_size / (1024 * 1024 * 1024):.2f} GB"
+        
+    # 2. 가장 큰 파일 확장자를 기준으로 타입 결정!
+    type_str = default_type
+    if largest_ext:
+        if largest_ext in ['.pt', '.pth']: type_str = "PyTorch (.pt)"
+        elif largest_ext == '.safetensors': type_str = "Safetensors"
+        elif largest_ext == '.bin': type_str = "Binary (.bin)"
+        elif largest_ext == '.csv': type_str = "CSV Data"
+        elif largest_ext == '.json': type_str = "JSON Data"
+        elif largest_ext == '.txt': type_str = "Text Data"
+        elif largest_ext == '.zip': type_str = "ZIP Archive"
+        else: type_str = f"{largest_ext.upper()[1:]} File"
+        
+    return size_str, type_str
+
 # ==========================================
 # 6. API 엔드포인트
 # ==========================================
@@ -258,13 +303,20 @@ def get_all_models():
     
     result = []
     for m in models:
+
+        # 🟢 계산기 작동!
+        target_dir = f"./storage/models/{m.name}"
+        real_size, real_type = get_real_file_info(target_dir, "AI Model")
+
         result.append({
             "id": m.id,
             "name": m.name,
             "author": m.author,
-            "size": "420 MB", 
-            "type": "PyTorch (.pt)",
-            "created_at": m.created_at.strftime("%Y-%m-%d %H:%M")
+            "size": real_size,  # 계산된 진짜 용량!
+            "type": real_type,  # 계산된 진짜 타입!
+            "created_at": m.created_at.strftime("%Y-%m-%d %H:%M"),
+            "downloads": int(m.downloads) if m.downloads and m.downloads.isdigit() else 0,
+            "likes": int(m.likes) if hasattr(m, 'likes') and m.likes else 0
         })
     return {"status": "success", "data": result}
 
@@ -282,7 +334,8 @@ def get_model(model_name: str):
         "data": {
             "name": model.name, "author": model.author, "downloads": model.downloads,
             "likes": model.likes, "license": model.license,
-            "tags": model.tags.split(",") if model.tags else [], "readme": model.readme
+            "tags": model.tags.split(",") if model.tags else [], "readme": model.readme,
+            "liked_by": model.liked_by if hasattr(model, 'liked_by') else ""
         }
     }
 
@@ -423,6 +476,17 @@ def download_model_file(model_name: str, file_name: str):
     if not os.path.exists(file_path):
         return {"status": "error", "message": "파일을 찾을 수 없습니다."}
     
+    # ==========================================
+    # 🟢 [NEW] DB에서 다운로드 숫자 1 증가시키기
+    # ==========================================
+    db = SessionLocal()
+    model = db.query(AIModel).filter(AIModel.name == model_name).first()
+    if model:
+        # 기존 숫자를 정수로 바꿔서 1 더한 후, 다시 문자로 저장 ("0" -> "1")
+        current_downloads = int(model.downloads) if model.downloads.isdigit() else 0
+        model.downloads = str(current_downloads + 1)
+        db.commit()
+    db.close()
     # 브라우저가 파일을 다운로드하도록 응답
     return FileResponse(path=file_path, filename=file_name)
 
@@ -466,13 +530,18 @@ def get_all_datasets():
     
     result = []
     for d in datasets:
+        # 🟢 계산기 작동!
+        target_dir = f"./storage/datasets/{d.name}"
+        real_size, real_type = get_real_file_info(target_dir, "Dataset")
         result.append({
             "id": d.id,
             "name": d.name,
             "author": d.author,
-            "size": "0 MB", # 추후 파일 연동
-            "type": "Dataset",
-            "created_at": d.created_at.strftime("%Y-%m-%d %H:%M")
+            "size": real_size,  # 계산된 진짜 용량!
+            "type": real_type,  # 계산된 진짜 타입!
+            "created_at": d.created_at.strftime("%Y-%m-%d %H:%M"),
+            "downloads": int(d.downloads) if d.downloads and d.downloads.isdigit() else 0,
+            "likes": int(d.likes) if hasattr(d, 'likes') and d.likes else 0
         })
     return {"status": "success", "data": result}
 
@@ -490,7 +559,9 @@ def get_dataset(dataset_name: str):
         "data": {
             "name": dataset.name, "author": dataset.author, "downloads": dataset.downloads,
             "likes": dataset.likes, "license": dataset.license,
-            "tags": dataset.tags.split(",") if dataset.tags else [], "readme": dataset.readme
+            "tags": dataset.tags.split(",") if dataset.tags else [], "readme": dataset.readme,
+            "downloads": int(dataset.downloads) if dataset.downloads and dataset.downloads.isdigit() else 0 ,
+            "liked_by": dataset.liked_by if hasattr(dataset, 'liked_by') else ""
         }
     }
 
@@ -539,4 +610,98 @@ def download_dataset_file(dataset_name: str, file_name: str):
     file_path = f"./storage/datasets/{dataset_name}/{file_name}"
     if not os.path.exists(file_path):
         return {"status": "error", "message": "파일을 찾을 수 없습니다."}
+
+
+    db = SessionLocal()
+    dataset = db.query(Dataset).filter(Dataset.name == dataset_name).first()
+    if dataset:
+        current_downloads = int(dataset.downloads) if dataset.downloads.isdigit() else 0
+        dataset.downloads = str(current_downloads + 1)
+        db.commit()
+    db.close()
+
     return FileResponse(path=file_path, filename=file_name)
+
+
+# 🟢 [NEW] 데이터셋 완전 삭제 (DB + 실제 폴더 파일 삭제)
+@app.delete("/datasets/{dataset_name}")
+def delete_dataset(dataset_name: str):
+    db = SessionLocal()
+    dataset = db.query(Dataset).filter(Dataset.name == dataset_name).first()
+    
+    if not dataset:
+        db.close()
+        return {"status": "error", "message": "데이터셋을 찾을 수 없습니다."}
+        
+    # 1. DB에서 기록 삭제
+    db.delete(dataset)
+    db.commit()
+    db.close()
+    
+    # 2. 로컬 서버에 저장된 무거운 실제 파일/폴더 깔끔하게 날리기!
+    target_dir = f"./storage/datasets/{dataset_name}"
+    if os.path.exists(target_dir):
+        shutil.rmtree(target_dir) # 폴더 통째로 삭제
+        
+    return {"status": "success", "message": f"{dataset_name} 데이터셋이 완벽하게 삭제되었습니다."}
+
+
+
+# ==========================================
+# 🟢 [NEW] 좋아요 기능 API 추가
+# ==========================================
+# 🟢 모델 좋아요 누르기 (계정당 1회 & 토글 기능)
+@app.post("/models/{model_name}/like")
+def like_model(model_name: str, username: str):
+    db = SessionLocal()
+    model = db.query(AIModel).filter(AIModel.name == model_name).first()
+    if not model:
+        db.close()
+        return {"status": "error", "message": "모델을 찾을 수 없습니다."}
+    
+    # "admin,testuser" 같은 문자열을 리스트로 변환
+    liked_users = model.liked_by.split(",") if hasattr(model, 'liked_by') and model.liked_by else []
+    liked_users = [u.strip() for u in liked_users if u.strip()]
+    
+    # 🟢 토글(Toggle) 로직: 이미 누른 명단에 있으면 빼고, 없으면 넣기!
+    if username in liked_users:
+        liked_users.remove(username)
+    else:
+        liked_users.append(username)
+        
+    model.liked_by = ",".join(liked_users)
+    model.likes = str(len(liked_users)) # 좋아요 갯수 동기화
+    db.commit()
+    
+    result_likes = len(liked_users)
+    result_liked_by = model.liked_by
+    db.close()
+    
+    return {"status": "success", "likes": result_likes, "liked_by": result_liked_by}
+
+# 🟢 데이터셋 좋아요 누르기 (계정당 1회 & 토글 기능)
+@app.post("/datasets/{dataset_name}/like")
+def like_dataset(dataset_name: str, username: str):
+    db = SessionLocal()
+    dataset = db.query(Dataset).filter(Dataset.name == dataset_name).first()
+    if not dataset:
+        db.close()
+        return {"status": "error", "message": "데이터셋을 찾을 수 없습니다."}
+    
+    liked_users = dataset.liked_by.split(",") if hasattr(dataset, 'liked_by') and dataset.liked_by else []
+    liked_users = [u.strip() for u in liked_users if u.strip()]
+    
+    if username in liked_users:
+        liked_users.remove(username)
+    else:
+        liked_users.append(username)
+        
+    dataset.liked_by = ",".join(liked_users)
+    dataset.likes = str(len(liked_users))
+    db.commit()
+    
+    result_likes = len(liked_users)
+    result_liked_by = dataset.liked_by
+    db.close()
+    
+    return {"status": "success", "likes": result_likes, "liked_by": result_liked_by}
